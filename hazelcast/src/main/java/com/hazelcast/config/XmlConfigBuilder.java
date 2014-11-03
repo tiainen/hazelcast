@@ -577,6 +577,8 @@ public class XmlConfigBuilder extends AbstractXmlConfigHelper implements ConfigB
                 awsConfig.setTagKey(value);
             } else if ("tag-value".equals(cleanNodeName(n.getNodeName()))) {
                 awsConfig.setTagValue(value);
+            } else if ("signature-version".equals(cleanNodeName(n.getNodeName()))) {
+                awsConfig.setSignatureVersion(value);
             }
         }
     }

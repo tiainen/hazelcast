@@ -49,6 +49,7 @@ public class AwsConfig {
     private String tagKey;
     private String tagValue;
     private String hostHeader = "ec2.amazonaws.com";
+    private String signatureVersion = "2";
     private int connectionTimeoutSeconds = CONNECTION_TIMEOUT;
 
     /**
@@ -252,6 +253,26 @@ public class AwsConfig {
         return this;
     }
 
+    /**
+     * Gets the AWS signature version; if nothing is specified "2" is returned.
+     *
+     * @return the AWS signature version.
+     */
+    public String getSignatureVersion() {
+        return signatureVersion;
+    }
+
+    /**
+     * Sets the AWS signature version to use when signing requests.
+     * 
+     * @param signatureVersion the AWS signature version
+     * @return the updated AwsConfig.
+     */
+    public AwsConfig setSignatureVersion(String signatureVersion) {
+        this.signatureVersion = signatureVersion;
+        return this;
+    }
+
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("AwsConfig{");
@@ -262,6 +283,7 @@ public class AwsConfig {
         sb.append(", tagValue='").append(tagValue).append('\'');
         sb.append(", hostHeader='").append(hostHeader).append('\'');
         sb.append(", connectionTimeoutSeconds=").append(connectionTimeoutSeconds);
+        sb.append(", signatureVersion=").append(signatureVersion);
         sb.append('}');
         return sb.toString();
     }

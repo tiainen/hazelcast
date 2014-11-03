@@ -17,6 +17,8 @@
 package com.hazelcast.aws.impl;
 
 import com.hazelcast.aws.security.EC2RequestSigner;
+import com.hazelcast.aws.security.EC2RequestSignerVersion2;
+import com.hazelcast.aws.security.EC2RequestSignerVersion4;
 import com.hazelcast.aws.utility.CloudyUtility;
 import com.hazelcast.config.AwsConfig;
 
@@ -31,8 +33,6 @@ import java.util.TimeZone;
 
 import static com.hazelcast.aws.impl.Constants.DOC_VERSION;
 import static com.hazelcast.aws.impl.Constants.GET;
-import static com.hazelcast.aws.impl.Constants.SIGNATURE_METHOD;
-import static com.hazelcast.aws.impl.Constants.SIGNATURE_VERSION;
 
 public class DescribeInstances {
 
@@ -48,13 +48,18 @@ public class DescribeInstances {
         if (awsConfig.getAccessKey() == null) {
             throw new IllegalArgumentException("AWS access key is required!");
         }
-        rs = new EC2RequestSigner(awsConfig.getSecretKey());
-        attributes.put("Action", this.getClass().getSimpleName());
-        attributes.put("Version", DOC_VERSION);
-        attributes.put("SignatureVersion", SIGNATURE_VERSION);
-        attributes.put("SignatureMethod", SIGNATURE_METHOD);
-        attributes.put("AWSAccessKeyId", awsConfig.getAccessKey());
-        attributes.put("Timestamp", getFormattedTimestamp());
+        String signatureVersion = awsConfig.getSignatureVersion();
+        if ("2".equals(signatureVersion)) {
+            rs = new EC2RequestSignerVersion2(awsConfig.getSecretKey());
+            attributes.put("Action", this.getClass().getSimpleName());
+            attributes.put("Version", DOC_VERSION);
+            attributes.put("SignatureVersion", signatureVersion);
+            attributes.put("SignatureMethod", "HmacSHA256");
+            attributes.put("AWSAccessKeyId", awsConfig.getAccessKey());
+            attributes.put("Timestamp", getFormattedTimestamp());
+        } else {
+            rs = new EC2RequestSignerVersion4(awsConfig);
+        }
         this.awsConfig = awsConfig;
     }
 
@@ -67,6 +72,14 @@ public class DescribeInstances {
         return df.format(new Date());
     }
 
+    /**
+     * Formats date as ISO 8601 timestamp
+     */
+    private String getFormattedTimestamp2() {
+        SimpleDateFormat df = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'");
+        df.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return df.format(new Date());
+    }
 
     public String getQueryString() {
         return CloudyUtility.getQueryString(attributes);
@@ -74,6 +87,10 @@ public class DescribeInstances {
 
     public Map<String, String> getAttributes() {
         return attributes;
+    }
+
+    public String getAccessKey() {
+        return awsConfig.getAccessKey();
     }
 
     public void putSignature(String value) {
