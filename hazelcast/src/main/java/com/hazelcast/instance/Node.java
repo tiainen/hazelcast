@@ -562,7 +562,7 @@ public class Node {
             Class clazz;
             try {
                 logger.info("Creating AWSJoiner");
-                clazz = Class.forName("com.hazelcast.cluster.TcpIpJoinerOverAWS");
+                clazz = Class.forName("com.hazelcast.cluster.impl.TcpIpJoinerOverAWS");
                 Constructor constructor = clazz.getConstructor(Node.class);
                 return (Joiner) constructor.newInstance(this);
             } catch (Exception e) {

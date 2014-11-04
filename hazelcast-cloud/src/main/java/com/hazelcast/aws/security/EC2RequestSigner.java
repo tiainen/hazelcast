@@ -16,6 +16,7 @@
 package com.hazelcast.aws.security;
 
 import com.hazelcast.aws.impl.DescribeInstances;
+import java.util.Map;
 
 /**
  *
@@ -23,6 +24,6 @@ import com.hazelcast.aws.impl.DescribeInstances;
  */
 public abstract class EC2RequestSigner {
 
-    public abstract void sign(DescribeInstances request, String endpoint);
+    public abstract Map<String, String> execute(DescribeInstances request, String endpoint) throws Exception;
 
 }

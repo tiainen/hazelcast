@@ -16,8 +16,13 @@
 
 package com.hazelcast.aws.security;
 
+import static com.hazelcast.aws.impl.Constants.GET;
 import com.hazelcast.aws.impl.DescribeInstances;
 import com.hazelcast.aws.utility.AwsURLEncoder;
+import com.hazelcast.aws.utility.CloudyUtility;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import java.security.SignatureException;
 import java.util.List;
@@ -39,7 +44,23 @@ public class EC2RequestSignerVersion2 extends EC2RequestSigner {
     }
 
     @Override
-    public void sign(DescribeInstances request, String endpoint) {
+    public Map<String, String> execute(DescribeInstances request, String endpoint) throws Exception {
+        sign(request, endpoint);
+        InputStream stream = callService(request, endpoint);
+        return CloudyUtility.unmarshalTheResponse(stream, request.getAwsConfig());
+    }
+
+    private InputStream callService(DescribeInstances request, String endpoint) throws Exception {
+        String query = request.getQueryString();
+        URL url = new URL("https", endpoint, -1, "/" + query);
+        HttpURLConnection httpConnection = (HttpURLConnection) (url.openConnection());
+        httpConnection.setRequestMethod(GET);
+        httpConnection.setDoOutput(true);
+        httpConnection.connect();
+        return httpConnection.getInputStream();
+    }
+
+    private void sign(DescribeInstances request, String endpoint) {
         String canonicalizedQueryString = getCanonicalizedQueryString(request);
         String stringToSign = HTTP_VERB + endpoint + "\n" + HTTP_REQUEST_URI + canonicalizedQueryString;
         String signature = signTheString(stringToSign);

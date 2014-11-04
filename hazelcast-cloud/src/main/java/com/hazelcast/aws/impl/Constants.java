@@ -20,7 +20,8 @@ public final class Constants {
 
     public static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'Z'";
     public static final String DOC_VERSION = "2011-05-15";
-    public static final String SIGNATURE_METHOD = "";
+    public static final String SIGNATURE_METHOD = "HmacSHA256";
+    public static final String SIGNATURE_VERSION = "2";
     public static final String GET = "GET";
 
 }

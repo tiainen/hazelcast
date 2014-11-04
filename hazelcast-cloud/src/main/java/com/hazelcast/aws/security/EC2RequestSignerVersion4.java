@@ -16,40 +16,101 @@
 
 package com.hazelcast.aws.security;
 
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.services.ec2.AmazonEC2Client;
+import com.amazonaws.services.ec2.model.DescribeInstancesResult;
+import com.amazonaws.services.ec2.model.GroupIdentifier;
+import com.amazonaws.services.ec2.model.Instance;
+import com.amazonaws.services.ec2.model.Reservation;
+import com.amazonaws.services.ec2.model.Tag;
 import com.hazelcast.aws.impl.DescribeInstances;
 import com.hazelcast.config.AwsConfig;
-
-import sun.security.jca.GetInstance.Instance;
+import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.Logger;
+import static java.lang.String.format;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class EC2RequestSignerVersion4 extends EC2RequestSigner {
+
+    static final ILogger LOGGER = Logger.getLogger(EC2RequestSignerVersion4.class);
+
 //    private static final String HTTP_VERB = "GET\n";
 //    private static final String HTTP_REQUEST_URI = "/\n";
 //    private final String secretKey;
 
+    private final AmazonEC2Client client;
     private final AwsConfig config;
 
     public EC2RequestSignerVersion4(AwsConfig config) {
         this.config = config;
 
         AWSCredentials credentials = new BasicAWSCredentials(config.getAccessKey(), config.getSecretKey());
-        AmazonEC2Client client = new AmazonEC2Client(credentials);
-        client.setEndpoint(config.getRegion());
-
-        DescribeInstancesResult result = client.describeInstances();
-        for (Reservation reservation : result.getReservations()) {
-            for (Instance instance : reservation.getInstances()) {
-                for (GroupIdentifier group : instance.getSecurityGroups()) {
-                    if (group.getGroupName().equals("devoxx hunt application")) {
-                        System.out.println("EC2 instance " + instance.getPrivateIpAddress());
-                        hazelcastConfig.addAddress(instance.getPrivateIpAddress(), instance.getPrivateIpAddress() + ":5701");
-                    }
-                }
-            }
-        }
+        client = new AmazonEC2Client(credentials);
     }
 
     @Override
-    public void sign(DescribeInstances request, String endpoint) {
+    public Map<String, String> execute(DescribeInstances request, String endpoint) throws Exception {
+        client.setEndpoint(endpoint);
+
+        Map<String, String> privatePublicPairs = new LinkedHashMap<String, String>();
+        DescribeInstancesResult result = client.describeInstances();
+        for (Reservation reservation : result.getReservations()) {
+            for (Instance instance : reservation.getInstances()) {
+                String state = instance.getState().getName();
+                String instanceName = getTagName(instance);
+                String privateIp = instance.getPrivateIpAddress();
+                String publicIp = instance.getPublicIpAddress();
+                if (!"running".equals(state)) {
+                    LOGGER.finest(format("Ignoring EC2 instance [%s][%s] reason:"
+                                + " the instance is not running but %s", instance.getTags(), privateIp, state));
+                } else if (!acceptTag(instance, config.getTagKey(), config.getTagValue())) {
+                    LOGGER.finest(format("Ignoring EC2 instance [%s][%s] reason:"
+                            + " tag-key/tag-value don't match", instanceName, privateIp));
+                } else if (!acceptGroupName(instance, config.getSecurityGroupName())) {
+                    LOGGER.finest(format("Ignoring EC2 instance [%s][%s] reason:"
+                            + " security-group-name doesn't match", instanceName, privateIp));
+                } else {
+                    privatePublicPairs.put(privateIp, publicIp);
+                    LOGGER.finest(format("Accepting EC2 instance [%s][%s]", instanceName, privateIp));
+                }
+            }
+        }
+        return privatePublicPairs;
+    }
+
+    private String getTagName(Instance instance) {
+        for (Tag tag : instance.getTags()) {
+            if ("Name".equals(tag.getKey())) {
+                return tag.getValue();
+            }
+        }
+        return null;
+    }
+
+    private boolean acceptTag(Instance instance, String tagKey, String tagValue) {
+        if (tagKey == null || "".equals(tagKey)) {
+            return true;
+        }
+        for (Tag tag : instance.getTags()) {
+            if (tag.getKey().equals(tagKey) && ((tagValue == null || "".equals(tagValue)) || tagValue.equals(tag.getValue()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean acceptGroupName(Instance instance, String groupName) {
+        if (groupName == null || "".equals(groupName)) {
+            return true;
+        }
+        for (GroupIdentifier group : instance.getSecurityGroups()) {
+            if (group.getGroupName().equals(groupName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 /*
